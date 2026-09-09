@@ -1,9 +1,11 @@
 import {database} from '@/lib/db';
 import {initialProfiles,inspectData,type Daily,type Profile,type Report} from '@/lib/model';
 import {validateRecords,validateProfiles,validDate,parseCsv} from '@/lib/validation';
+import {hasWorkspaceAccess} from '@/lib/access';
 export async function readWorkspace(){const data=await database().prepare('SELECT key,value FROM workspace').all<{key:string;value:string}>();const items=Object.fromEntries(data.results.map(r=>[r.key,JSON.parse(r.value)]));return {profiles:(items.profiles||initialProfiles) as Profile[],records:Object.entries(items).filter(([k])=>k.startsWith('daily:')).map(([,v])=>v) as Daily[],reports:(Object.entries(items).filter(([k])=>k.startsWith('report:')).map(([,v])=>v) as Report[]).sort((a,b)=>b.at.localeCompare(a.at))};}
-export async function GET(){try{return Response.json(await readWorkspace(),{headers:{'Cache-Control':'no-store'}});}catch{return Response.json({error:'数据服务暂不可用'},{status:503});}}
+export async function GET(request:Request){if(!(await hasWorkspaceAccess(request)))return Response.json({error:'请输入工作台密码'},{status:401});try{return Response.json(await readWorkspace(),{headers:{'Cache-Control':'no-store'}});}catch{return Response.json({error:'数据服务暂不可用'},{status:503});}}
 export async function POST(request:Request){
+ if(!(await hasWorkspaceAccess(request)))return Response.json({error:'请输入工作台密码'},{status:401});
  const origin=request.headers.get('origin');if(!origin||origin!==new URL(request.url).origin)return Response.json({error:'只接受工作台内的操作。API 采集尚未配置。'},{status:403});
  if(!request.headers.get('content-type')?.startsWith('application/json'))return Response.json({error:'须使用 JSON 请求'},{status:415});
  let body;try{const text=await request.text();if(text.length>1500000)return Response.json({error:'请求过大'},{status:413});body=JSON.parse(text);}catch{return Response.json({error:'JSON 格式无效'},{status:400});}

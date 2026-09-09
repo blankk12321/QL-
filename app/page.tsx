@@ -1,7 +1,7 @@
 'use client';
 import {useEffect,useState} from 'react';
 import {registerWorkspaceTool} from '@/lib/webmcp';
-import {Activity,ArrowUpRight,Download,RefreshCw,Plus,Store,Video,ShieldCheck,Clock3,Database} from 'lucide-react';
+import {Activity,ArrowUpRight,Download,RefreshCw,Plus,Store,Video,ShieldCheck,Clock3,Database,LockKeyhole} from 'lucide-react';
 import {Tabs,TabsList,TabsTrigger,TabsContent} from '@/components/ui/tabs';
 import {Table,TableHeader,TableBody,TableRow,TableHead,TableCell} from '@/components/ui/table';
 import {Dialog,DialogContent,DialogTitle,DialogDescription} from '@/components/ui/dialog';
@@ -13,9 +13,9 @@ const num=(v:unknown)=>typeof v==='number'?v.toLocaleString('en-US',{maximumFrac
 const money=(v:unknown)=>typeof v==='number'?'$'+v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';
 export default function Home(){
  const [profiles,setProfiles]=useState<Profile[]>(initialProfiles),[records,setRecords]=useState<Daily[]>([]),[reports,setReports]=useState<Report[]>([]);
- const [date,setDate]=useState(yesterday),[filter,setFilter]=useState('all'),[tab,setTab]=useState('overview'),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),[loaded,setLoaded]=useState(false);
+ const [date,setDate]=useState(yesterday),[filter,setFilter]=useState('all'),[tab,setTab]=useState('overview'),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),[loaded,setLoaded]=useState(false),[authorized,setAuthorized]=useState<boolean|null>(null),[password,setPassword]=useState('');
  const [edit,setEdit]=useState(false),[chosen,setChosen]=useState('pop-1'),[form,setForm]=useState<Record<string,string>>({}),[importOpen,setImportOpen]=useState(false),[csv,setCsv]=useState('');
- async function load(){setBusy(true);setError('');try{const r=await fetch('/api/workspace');if(!r.ok)throw Error('工作台数据暂时无法读取，请稍后刷新。');const d=await r.json() as {profiles:Profile[];records:Daily[];reports:Report[]};setProfiles(d.profiles);setRecords(d.records);setReports(d.reports);setLoaded(true);}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
+ async function load(){setBusy(true);setError('');try{const r=await fetch('/api/workspace');if(r.status===401){setAuthorized(false);return;}if(!r.ok)throw Error('工作台数据暂时无法读取，请稍后刷新。');const d=await r.json() as {profiles:Profile[];records:Daily[];reports:Report[]};setProfiles(d.profiles);setRecords(d.records);setReports(d.reports);setLoaded(true);setAuthorized(true);}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
  useEffect(()=>{void Promise.resolve().then(()=>load());},[]);
  useEffect(()=>registerWorkspaceTool(),[]);
  async function save(payload:unknown){setBusy(true);setError('');setNotice('');try{const r=await fetch('/api/workspace',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const d=await r.json() as {error?:string;message?:string};if(!r.ok)throw Error(d.error||'保存失败');await load();setNotice(d.message||'已保存');return true;}catch(e){setError((e as Error).message);return false;}finally{setBusy(false);}}
@@ -26,6 +26,8 @@ export default function Home(){
  const alerts=inspectData(records,profiles,date);
  function openEntry(id='pop-1'){setChosen(id);const r=records.find(r=>r.profile===id&&r.date===date);setForm(Object.fromEntries([['source',String(r?.source||'后台人工记录')],...fields.map(([k])=>[k,r?.[k]==null?'':String(r[k])])]));setEdit(true);}
  function download(){const blob=new Blob(['\uFEFF'+['date,profile,source,'+fields.map(f=>f[0]).join(','),date+',pop-1,后台导出,'+fields.map(()=> '').join(',')].join('\r\n')],{type:'text/csv;charset=utf-8'});const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download='TK每日数据模板.csv';a.click();URL.revokeObjectURL(u);}
+ async function unlock(e:React.FormEvent){e.preventDefault();setBusy(true);setError('');try{const r=await fetch('/api/access',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password})});const d=await r.json() as {error?:string};if(!r.ok)throw Error(d.error||'无法验证密码');setPassword('');await load();}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
+ if(authorized!==true)return <main className="accessgate"><section><LockKeyhole size={28}/><p className="eyebrow">TK POD OPERATIONS</p><h1>手机壳工作台</h1><p>请输入访问密码后继续。</p><form onSubmit={unlock}><Input aria-label="访问密码" type="password" autoFocus value={password} onChange={e=>setPassword(e.target.value)} placeholder="访问密码" required/><Button type="submit" disabled={busy||authorized===null}>{authorized===null?'正在检查…':'进入工作台'}</Button></form>{error&&<div className="feedback error" role="alert">{error}</div>}</section></main>;
  return <div className="workspace"><header className="topbar"><div className="brand"><span className="brandmark">TK</span><span>POD OPERATIONS</span><span className="branddivider"/><span>手机壳工作台</span></div><span className="private"><ShieldCheck size={16}/>个人工作空间</span></header>
  <main><div className="pageheading"><div><p className="eyebrow">美国市场 · 3 店 / 4 账号</p><h1>每日运营，一处掌握<span className="accentdot">.</span></h1></div><div className="actions"><Button variant="outline" onClick={()=>void load()} disabled={busy}><RefreshCw size={16}/>刷新</Button><Button onClick={()=>openEntry()} disabled={!loaded||busy}><Plus size={16}/>录入数据</Button></div></div>
  <div className="connection"><Database size={26}/><div><strong>等待 API 接入</strong><p>紫鸟位于另一台电脑。当前可录入和导入日报，尚未开启店铺自动采集。</p></div><button onClick={()=>setTab('sources')}>数据接入 <ArrowUpRight size={17}/></button></div>
