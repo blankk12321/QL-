@@ -1,12 +1,314 @@
-import {insightCategories,type InsightRow} from './intelligence';
-import {fields,initialProfiles,type Daily,type Profile} from './model';
-export function validDate(s:unknown):s is string{if(typeof s!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(s))return false;const d=new Date(s+'T12:00:00Z');return !Number.isNaN(d.valueOf())&&d.toISOString().slice(0,10)===s;}
-export function validateRecords(input:unknown):Daily[]{if(!Array.isArray(input)||!input.length||input.length>500)throw Error('每次导入 1–500 行。');const seen=new Set<string>();return input.map((r,i)=>{if(!r||typeof r!=='object')throw Error('记录格式无效');if(!validDate(r.date))throw Error(`第 ${i+1} 行日期无效，使用 YYYY-MM-DD。`);if(!initialProfiles.some(p=>p.id===r.profile))throw Error(`第 ${i+1} 行 profile 不在登记列表中。`);if(typeof r.source!=='string'||!r.source.trim()||r.source.length>200)throw Error('每行须填写数据来源（不超过200字）。');const key=r.date+':'+r.profile;if(seen.has(key))throw Error('同一次导入包含重复日期和账号，请先合并。');seen.add(key);const out:Daily={date:r.date,profile:r.profile,source:r.source.trim(),updatedAt:new Date().toISOString()};for(const [k,label] of fields){const v=r[k];if(v===null||v===undefined||v===''){out[k]=null;continue;}if(typeof v!=='number'||!Number.isFinite(v)||v<0||v>1e12)throw Error(`${label} 必须是有效非负数字。`);if(['orders','visitors','productViews','pending','late','violations','views','clicks','videos'].includes(k)&&!Number.isInteger(v))throw Error(`${label} 必须是整数。`);out[k]=v;}return out;});}
-export function validateProfiles(input:unknown):Profile[]{if(!Array.isArray(input)||input.length!==7)throw Error('须保留三个店铺和四个账号。');const ids=new Set();return input.map(p=>{const original=initialProfiles.find(x=>x.id===p?.id);if(!original||ids.has(p.id))throw Error('登记编号无效或重复');ids.add(p.id);if(typeof p.name!=='string'||!p.name.trim()||p.name.length>80||typeof p.environment!=='string'||p.environment.length>200)throw Error('请填写名称，名称最长80字，环境备注最长200字。');return {...original,name:p.name.trim(),environment:p.environment.trim()};});}
-export function parseCsv(text:unknown):Daily[]{if(typeof text!=='string'||text.length>1000000)throw Error('CSV 过大或格式不正确');const rows:string[][]=[];let row:string[]=[],value='',quoted=false;const s=text.replace(/^\uFEFF/,'').replace(/\r\n/g,'\n');for(let i=0;i<s.length;i++){const c=s[i];if(c==='"'){if(quoted&&s[i+1]==='"'){value+='"';i++;}else quoted=!quoted;}else if(c===','&&!quoted){row.push(value);value='';}else if(c==='\n'&&!quoted){row.push(value);if(row.some(v=>v.trim()))rows.push(row);row=[];value='';}else value+=c;}if(quoted)throw Error('CSV 引号未闭合');row.push(value);if(row.some(v=>v.trim()))rows.push(row);const head=rows.shift()?.map(x=>x.trim());if(!head||!['date','profile','source'].every(k=>head.includes(k)))throw Error('缺少 date、profile 或 source 表头。请下载模板。');const allowed=new Set<string>(['date','profile','source',...fields.map(f=>f[0])]);if(new Set(head).size!==head.length||head.some(k=>!allowed.has(k)))throw Error('表头重复或包含未知字段，请使用模板。');return validateRecords(rows.map((r,i)=>{if(r.length!==head.length)throw Error(`第 ${i+2} 行列数与表头不一致。`);return Object.fromEntries(head.map((k,j)=>{const v=r[j].trim();return [k,['date','profile','source'].includes(k)?v:v===''?null:Number(v)];}));}));}
+import { insightCategories, type InsightRow } from './intelligence';
+import { fields, initialProfiles, type Daily, type Profile } from './model';
+export function validDate(s: unknown): s is string {
+  if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = new Date(s + 'T12:00:00Z');
+  return !Number.isNaN(d.valueOf()) && d.toISOString().slice(0, 10) === s;
+}
+export function validateRecords(input: unknown): Daily[] {
+  if (!Array.isArray(input) || !input.length || input.length > 500)
+    throw Error('每次导入 1–500 行。');
+  const seen = new Set<string>();
+  return input.map((r, i) => {
+    if (!r || typeof r !== 'object') throw Error('记录格式无效');
+    if (!validDate(r.date))
+      throw Error(`第 ${i + 1} 行日期无效，使用 YYYY-MM-DD。`);
+    if (!initialProfiles.some((p) => p.id === r.profile))
+      throw Error(`第 ${i + 1} 行 profile 不在登记列表中。`);
+    if (
+      typeof r.source !== 'string' ||
+      !r.source.trim() ||
+      r.source.length > 200
+    )
+      throw Error('每行须填写数据来源（不超过200字）。');
+    const key = r.date + ':' + r.profile;
+    if (seen.has(key)) throw Error('同一次导入包含重复日期和账号，请先合并。');
+    seen.add(key);
+    const out: Daily = {
+      date: r.date,
+      profile: r.profile,
+      source: r.source.trim(),
+      updatedAt: new Date().toISOString(),
+    };
+    for (const [k, label] of fields) {
+      const v = r[k];
+      if (v === null || v === undefined || v === '') {
+        out[k] = null;
+        continue;
+      }
+      if (typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > 1e12)
+        throw Error(`${label} 必须是有效非负数字。`);
+      if (
+        [
+          'orders',
+          'visitors',
+          'productImpressions',
+          'productViews',
+          'pending',
+          'late',
+          'violations',
+          'views',
+          'clicks',
+          'videos',
+        ].includes(k) &&
+        !Number.isInteger(v)
+      )
+        throw Error(`${label} 必须是整数。`);
+      out[k] = v;
+    }
+    return out;
+  });
+}
+export function validateProfiles(input: unknown): Profile[] {
+  if (!Array.isArray(input) || input.length !== 7)
+    throw Error('须保留三个店铺和四个账号。');
+  const ids = new Set();
+  return input.map((p) => {
+    const original = initialProfiles.find((x) => x.id === p?.id);
+    if (!original || ids.has(p.id)) throw Error('登记编号无效或重复');
+    ids.add(p.id);
+    if (
+      typeof p.name !== 'string' ||
+      !p.name.trim() ||
+      p.name.length > 80 ||
+      typeof p.environment !== 'string' ||
+      p.environment.length > 200
+    )
+      throw Error('请填写名称，名称最长80字，环境备注最长200字。');
+    return {
+      ...original,
+      name: p.name.trim(),
+      environment: p.environment.trim(),
+    };
+  });
+}
+export function parseCsv(text: unknown): Daily[] {
+  if (typeof text !== 'string' || text.length > 1000000)
+    throw Error('CSV 过大或格式不正确');
+  const rows: string[][] = [];
+  let row: string[] = [],
+    value = '',
+    quoted = false;
+  const s = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (c === '"') {
+      if (quoted && s[i + 1] === '"') {
+        value += '"';
+        i++;
+      } else quoted = !quoted;
+    } else if (c === ',' && !quoted) {
+      row.push(value);
+      value = '';
+    } else if (c === '\n' && !quoted) {
+      row.push(value);
+      if (row.some((v) => v.trim())) rows.push(row);
+      row = [];
+      value = '';
+    } else value += c;
+  }
+  if (quoted) throw Error('CSV 引号未闭合');
+  row.push(value);
+  if (row.some((v) => v.trim())) rows.push(row);
+  const head = rows.shift()?.map((x) => x.trim());
+  if (!head || !['date', 'profile', 'source'].every((k) => head.includes(k)))
+    throw Error('缺少 date、profile 或 source 表头。请下载模板。');
+  const allowed = new Set<string>([
+    'date',
+    'profile',
+    'source',
+    ...fields.map((f) => f[0]),
+  ]);
+  if (new Set(head).size !== head.length || head.some((k) => !allowed.has(k)))
+    throw Error('表头重复或包含未知字段，请使用模板。');
+  return validateRecords(
+    rows.map((r, i) => {
+      if (r.length !== head.length)
+        throw Error(`第 ${i + 2} 行列数与表头不一致。`);
+      return Object.fromEntries(
+        head.map((k, j) => {
+          const v = r[j].trim();
+          return [
+            k,
+            ['date', 'profile', 'source'].includes(k)
+              ? v
+              : v === ''
+                ? null
+                : Number(v),
+          ];
+        }),
+      );
+    }),
+  );
+}
 
-export function validateSnapshots(input:unknown){if(!Array.isArray(input)||!input.length||input.length>20)throw Error('同步快照数量无效。');return input.map((raw,i)=>{if(!raw||typeof raw!=='object'||!initialProfiles.some(p=>p.id===raw.profile))throw Error(`第 ${i+1} 条快照店铺无效。`);if(typeof raw.checkedAt!=='string'||Number.isNaN(Date.parse(raw.checkedAt))||typeof raw.source!=='string'||!raw.source.trim())throw Error('快照时间或来源无效。');const out:any={profile:raw.profile,checkedAt:raw.checkedAt,source:raw.source.trim()};for(const k of ['activeProducts','visitors','productViews','ordersToShip','pendingReturns','violations','healthScore']){const v=raw[k];if(v===undefined||v===null){out[k]=null;continue;}if(typeof v!=='number'||!Number.isFinite(v)||v<0||!Number.isInteger(v))throw Error(`${k} 必须是非负整数。`);out[k]=v;}if(raw.note!==undefined){if(typeof raw.note!=='string'||raw.note.length>500)throw Error('快照说明无效。');out.note=raw.note;}return out;});}
+export function validateSnapshots(input: unknown) {
+  if (!Array.isArray(input) || !input.length || input.length > 20)
+    throw Error('同步快照数量无效。');
+  return input.map((raw, i) => {
+    if (
+      !raw ||
+      typeof raw !== 'object' ||
+      !initialProfiles.some((p) => p.id === raw.profile)
+    )
+      throw Error(`第 ${i + 1} 条快照店铺无效。`);
+    if (
+      typeof raw.checkedAt !== 'string' ||
+      Number.isNaN(Date.parse(raw.checkedAt)) ||
+      typeof raw.source !== 'string' ||
+      !raw.source.trim()
+    )
+      throw Error('快照时间或来源无效。');
+    const out: any = {
+      profile: raw.profile,
+      checkedAt: raw.checkedAt,
+      source: raw.source.trim(),
+    };
+    for (const k of [
+      'activeProducts',
+      'visitors',
+      'productViews',
+      'ordersToShip',
+      'pendingReturns',
+      'violations',
+      'healthScore',
+    ]) {
+      const v = raw[k];
+      if (v === undefined || v === null) {
+        out[k] = null;
+        continue;
+      }
+      if (
+        typeof v !== 'number' ||
+        !Number.isFinite(v) ||
+        v < 0 ||
+        !Number.isInteger(v)
+      )
+        throw Error(`${k} 必须是非负整数。`);
+      out[k] = v;
+    }
+    if (raw.note !== undefined) {
+      if (typeof raw.note !== 'string' || raw.note.length > 500)
+        throw Error('快照说明无效。');
+      out.note = raw.note;
+    }
+    return out;
+  });
+}
 
-export function validateProducts(input:unknown){if(!Array.isArray(input)||input.length>500)throw Error('每批最多500条商品记录');return input.map(p=>{if(!p||!validDate(p.date)||!initialProfiles.some(s=>s.kind==='店铺'&&s.id===p.profile))throw Error('商品日期或店铺无效');for(const key of ['productId','title','source'])if(typeof p[key]!=='string'||!p[key].trim()||p[key].length>500)throw Error('商品标识、名称和来源必填');const out={date:p.date,profile:p.profile,productId:p.productId,title:p.title,source:p.source,model:typeof p.model==='string'?p.model.slice(0,100):'',orders:null as number|null,units:null as number|null,gmv:null as number|null,refunds:null as number|null,refundOrders:null as number|null};for(const k of ['orders','units','gmv','refunds','refundOrders'] as const){const v=p[k];if(v==null)continue;if(typeof v!=='number'||!Number.isFinite(v)||v<0||v>1e12||(['orders','units','refundOrders'].includes(k)&&!Number.isInteger(v)))throw Error('商品指标无效');out[k]=v;}return out;});}
+export function validateProducts(input: unknown) {
+  if (!Array.isArray(input) || input.length > 500)
+    throw Error('每批最多500条商品记录');
+  return input.map((p) => {
+    if (
+      !p ||
+      !validDate(p.date) ||
+      !initialProfiles.some((s) => s.kind === '店铺' && s.id === p.profile)
+    )
+      throw Error('商品日期或店铺无效');
+    for (const key of ['productId', 'title', 'source'])
+      if (typeof p[key] !== 'string' || !p[key].trim() || p[key].length > 500)
+        throw Error('商品标识、名称和来源必填');
+    const out = {
+      date: p.date,
+      profile: p.profile,
+      productId: p.productId,
+      title: p.title,
+      source: p.source,
+      model: typeof p.model === 'string' ? p.model.slice(0, 100) : '',
+      sku: typeof p.sku === 'string' ? p.sku.slice(0, 200) : '',
+      imageUrl:
+        typeof p.imageUrl === 'string' && /^https:\/\//.test(p.imageUrl)
+          ? p.imageUrl.slice(0, 1000)
+          : '',
+      orders: null as number | null,
+      units: null as number | null,
+      gmv: null as number | null,
+      refunds: null as number | null,
+      refundOrders: null as number | null,
+      refundUnits: null as number | null,
+      confirmedRefundUnits: null as number | null,
+      quantityAmbiguousOrders: null as number | null,
+    };
+    for (const k of [
+      'orders',
+      'units',
+      'gmv',
+      'refunds',
+      'refundOrders',
+      'refundUnits',
+      'confirmedRefundUnits',
+      'quantityAmbiguousOrders',
+    ] as const) {
+      const v = p[k];
+      if (v == null) continue;
+      if (
+        typeof v !== 'number' ||
+        !Number.isFinite(v) ||
+        v < 0 ||
+        v > 1e12 ||
+        (!['gmv', 'refunds'].includes(k) && !Number.isInteger(v))
+      )
+        throw Error('商品指标无效');
+      out[k] = v;
+    }
+    return out;
+  });
+}
 
-export function validateInsights(input:unknown):InsightRow[]{if(!Array.isArray(input)||!input.length||input.length>500)throw Error('明细每批1至500条');return input.map(r=>{if(!r||!validDate(r.date)||!initialProfiles.some(p=>p.kind==='店铺'&&p.id===r.profile)||!insightCategories.includes(r.category))throw Error('明细分类或店铺日期无效');if(typeof r.label!=='string'||!r.label.trim()||r.label.length>300||typeof r.source!=='string'||!r.source.trim()||r.source.length>300)throw Error('明细名称和来源必填');const out:InsightRow={date:r.date,profile:r.profile,category:r.category,label:r.label,source:r.source,orders:null,gmv:null,units:null,refunds:null,views:null,clicks:null,hour:null};for(const k of ['orders','gmv','units','refunds','views','clicks','hour'] as const){const v=r[k];if(v==null)continue;if(typeof v!=='number'||!Number.isFinite(v)||v<0||v>1e12)throw Error('明细数值无效');if(!['gmv','refunds'].includes(k)&&!Number.isInteger(v))throw Error('计数必须为整数');out[k]=v;}if(r.category==='hourly'&&(out.hour===null||out.hour>23))throw Error('小时须为0至23');return out;});}
+export function validateInsights(input: unknown): InsightRow[] {
+  if (!Array.isArray(input) || !input.length || input.length > 500)
+    throw Error('明细每批1至500条');
+  return input.map((r) => {
+    if (
+      !r ||
+      !validDate(r.date) ||
+      !initialProfiles.some((p) => p.kind === '店铺' && p.id === r.profile) ||
+      !insightCategories.includes(r.category)
+    )
+      throw Error('明细分类或店铺日期无效');
+    if (
+      typeof r.label !== 'string' ||
+      !r.label.trim() ||
+      r.label.length > 300 ||
+      typeof r.source !== 'string' ||
+      !r.source.trim() ||
+      r.source.length > 300
+    )
+      throw Error('明细名称和来源必填');
+    const out: InsightRow = {
+      date: r.date,
+      profile: r.profile,
+      category: r.category,
+      label: r.label,
+      source: r.source,
+      orders: null,
+      gmv: null,
+      units: null,
+      refunds: null,
+      views: null,
+      clicks: null,
+      hour: null,
+    };
+    for (const k of [
+      'orders',
+      'gmv',
+      'units',
+      'refunds',
+      'views',
+      'clicks',
+      'hour',
+    ] as const) {
+      const v = r[k];
+      if (v == null) continue;
+      if (typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > 1e12)
+        throw Error('明细数值无效');
+      if (!['gmv', 'refunds'].includes(k) && !Number.isInteger(v))
+        throw Error('计数必须为整数');
+      out[k] = v;
+    }
+    if (r.category === 'hourly' && (out.hour === null || out.hour > 23))
+      throw Error('小时须为0至23');
+    return out;
+  });
+}
