@@ -9,6 +9,7 @@
     "dev": "vinext dev",
     "build": "vinext build",
     "start": "wrangler dev --config dist/server/wrangler.json",
+    "deploy": "npm run build && wrangler d1 migrations apply ql-dashboard --remote --config wrangler.jsonc && wrangler deploy --config wrangler.jsonc",
     "lint": "oxlint",
     "format": "oxfmt"
   },
