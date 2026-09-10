@@ -752,10 +752,19 @@ export default function Home() {
                   {productRows.map((p) => (
                     <TableRow key={p.profile + p.productId}>
                       <TableCell>
-                        <strong className="product-title">{p.title}</strong>
-                        <small>
-                          {p.model || '机型未提供'} · {p.productId}
-                        </small>
+                        <div className="product-cell">
+                          {p.imageUrl ? (
+                            <img src={p.imageUrl} alt="" loading="lazy" />
+                          ) : (
+                            <span className="product-placeholder">QL</span>
+                          )}
+                          <div>
+                            <strong className="product-title">{p.title}</strong>
+                            <small>
+                              {p.model || '机型未提供'} · {p.sku || p.productId}
+                            </small>
+                          </div>
+                        </div>
                       </TableCell>
                       <TableCell>
                         {profiles.find((s) => s.id === p.profile)?.name}
