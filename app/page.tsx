@@ -832,7 +832,7 @@ export default function Home() {
                     ].map(([label, value]) => (
                       <div key={String(label)}>
                         <dt>{label}</dt>
-                        <dd>{num(value)}</dd>
+                        <dd>{typeof value === 'string' ? value : num(value)}</dd>
                       </div>
                     ))}
                   </dl>
