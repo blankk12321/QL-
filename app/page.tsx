@@ -816,6 +816,18 @@ export default function Home() {
                       ['待处理退货', s?.pendingReturns],
                       ['未读违规', s?.violations],
                       ['在售商品', s?.activeProducts],
+                      ['商品上限', s?.listingLimit],
+                      ['被拒商品', s?.rejectedProducts],
+                      ['低库存商品', s?.lowStockProducts],
+                      ['近7天访客', s?.visitors],
+                      ['近7天商品浏览', s?.productViews],
+                      ['待处理样品申请', s?.pendingSampleRequests],
+                      ['未读工单', s?.unreadTickets],
+                      ['差评待办', s?.negativeReviews],
+                      ['当日订单 / 上限',
+                        s?.dailyOrders != null && s?.dailyOrderLimit != null
+                          ? `${s.dailyOrders} / ${s.dailyOrderLimit}`
+                          : null],
                       ['截止日超时未揽收', r?.late],
                     ].map(([label, value]) => (
                       <div key={String(label)}>

@@ -166,11 +166,19 @@ export function validateSnapshots(input: unknown) {
     };
     for (const k of [
       'activeProducts',
+      'listingLimit',
+      'rejectedProducts',
+      'lowStockProducts',
       'visitors',
       'productViews',
       'ordersToShip',
       'pendingReturns',
       'violations',
+      'unreadTickets',
+      'negativeReviews',
+      'pendingSampleRequests',
+      'dailyOrders',
+      'dailyOrderLimit',
       'healthScore',
     ]) {
       const v = raw[k];
