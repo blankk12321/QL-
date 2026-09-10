@@ -1,8 +1,8 @@
 import {database} from '@/lib/db';
 import {initialProfiles,inspectData,type Daily,type Profile,type Report,type Snapshot} from '@/lib/model';
-import {validateRecords,validateProfiles,validateSnapshots,validDate,parseCsv} from '@/lib/validation';
+import {validateProducts,validateRecords,validateProfiles,validateSnapshots,validDate,parseCsv} from '@/lib/validation';
 import {hasWorkspaceAccess} from '@/lib/access';
-export async function readWorkspace(){const data=await database().prepare('SELECT key,value FROM workspace').all<{key:string;value:string}>();const items=Object.fromEntries(data.results.map(r=>[r.key,JSON.parse(r.value)]));return {profiles:(items.profiles||initialProfiles) as Profile[],records:Object.entries(items).filter(([k])=>k.startsWith('daily:')).map(([,v])=>v) as Daily[],reports:(Object.entries(items).filter(([k])=>k.startsWith('report:')).map(([,v])=>v) as Report[]).sort((a,b)=>b.at.localeCompare(a.at)),snapshots:(items.snapshots||[]) as Snapshot[]};}
+export async function readWorkspace(){const data=await database().prepare('SELECT key,value FROM workspace').all<{key:string;value:string}>();const items=Object.fromEntries(data.results.map(r=>[r.key,JSON.parse(r.value)]));return {profiles:(items.profiles||initialProfiles) as Profile[],records:Object.entries(items).filter(([k])=>k.startsWith('daily:')).map(([,v])=>v) as Daily[],reports:(Object.entries(items).filter(([k])=>k.startsWith('report:')).map(([,v])=>v) as Report[]).sort((a,b)=>b.at.localeCompare(a.at)),products:Object.entries(items).filter(([k])=>k.startsWith('product:')).map(([,v])=>v),snapshots:(items.snapshots||[]) as Snapshot[]};}
 export async function GET(request:Request){if(!(await hasWorkspaceAccess(request)))return Response.json({error:'请输入工作台密码'},{status:401});try{return Response.json(await readWorkspace(),{headers:{'Cache-Control':'no-store'}});}catch{return Response.json({error:'数据服务暂不可用'},{status:503});}}
 export async function POST(request:Request){
  if(!(await hasWorkspaceAccess(request)))return Response.json({error:'请输入工作台密码'},{status:401});
@@ -12,6 +12,7 @@ export async function POST(request:Request){
  let changes:{key:string;value:unknown}[]=[];let message='';
  try{if(body.action==='profiles'){changes=[{key:'profiles',value:validateProfiles(body.profiles)}];message='店铺与账号登记已保存。';}
  else if(body.action==='records'||body.action==='csv'){const rows=body.action==='csv'?parseCsv(body.csv):validateRecords(body.records);changes=rows.map(r=>({key:'daily:'+r.date+':'+r.profile,value:r}));message=`已保存 ${rows.length} 条日报；同日同账号更新，不重复累加。`;}
+ else if(body.action==='products'){const rows=validateProducts(body.products);changes=rows.map(r=>({key:'product:'+r.date+':'+r.profile+':'+r.productId,value:r}));message='商品明细已保存';}
  else if(body.action==='snapshots'){changes=[{key:'snapshots',value:validateSnapshots(body.snapshots)}];message='已写入本次店铺实时快照。';}
  else if(body.action==='inspect'){if(!validDate(body.date))throw Error('统计日期无效');const w=await readWorkspace();const report={at:new Date().toISOString(),date:body.date,alerts:inspectData(w.records,w.profiles,body.date)};changes=[{key:'report:'+body.date,value:report}];message='巡检记录已保存。';}
  else throw Error('不支持的操作');
