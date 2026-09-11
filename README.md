@@ -2,7 +2,7 @@
 
 三家美区店（POP 1 家、ACCU 2 家），四个内容账号。店铺登录在另一台电脑的紫鸟中，用户稍后提供 API。当前没有店铺数据采集能力，所有初始经营指标为空。
 
-生产地址：https://blank-k.cc.cd
+生产地址：https://qinglan-crossborder.skillsam6688.chatgpt.site
 
 ## 运行
 npm install

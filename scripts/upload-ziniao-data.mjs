@@ -5,8 +5,12 @@ if (!input) throw new Error('用法: node scripts/upload-ziniao-data.mjs <抓取
 
 const token = process.env.QINGLAN_INGEST_TOKEN;
 if (!token) throw new Error('缺少 QINGLAN_INGEST_TOKEN');
+const sitesToken = process.env.QINGLAN_SITES_TOKEN;
+if (!sitesToken) throw new Error('缺少 QINGLAN_SITES_TOKEN');
 
-const origin = process.env.QINGLAN_SITE_ORIGIN || 'https://blank-k.cc.cd';
+const origin =
+  process.env.QINGLAN_SITE_ORIGIN ||
+  'https://qinglan-crossborder.skillsam6688.chatgpt.site';
 const source = JSON.parse(await readFile(input, 'utf8'));
 const payload = {
   records: source.daily || [],
@@ -16,6 +20,7 @@ const payload = {
 };
 const headers = {
   Authorization: `Bearer ${token}`,
+  'OAI-Sites-Authorization': `Bearer ${sitesToken}`,
   'Content-Type': 'application/json',
 };
 
@@ -24,7 +29,13 @@ const uploaded = await fetch(`${origin}/api/ingest`, {
   headers,
   body: JSON.stringify(payload),
 });
-const uploadedBody = await uploaded.json();
+const uploadedText = await uploaded.text();
+let uploadedBody;
+try {
+  uploadedBody = JSON.parse(uploadedText);
+} catch {
+  throw new Error(`上传端点返回非 JSON（HTTP ${uploaded.status}）`);
+}
 if (!uploaded.ok || !uploadedBody.ok)
   throw new Error(`上传失败: ${uploadedBody.error || uploaded.status}`);
 
