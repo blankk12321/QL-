@@ -28,7 +28,7 @@ async function authorizedToken(token: string | null | undefined) {
 }
 
 function jsonError(error: string, status: number) {
-  return Response.json({ ok: false, error }, { status });
+  return Response.json({ ok: false, error }, { status, headers: { 'X-Ingest-Version': '12' } });
 }
 
 export async function POST(request: Request) {
@@ -44,6 +44,8 @@ export async function POST(request: Request) {
     return jsonError('JSON 格式无效', 400);
   }
 
+  const configured = (env as unknown as { INGEST_TOKEN?: string }).INGEST_TOKEN;
+  if (!configured) return jsonError('服务密钥未配置', 503);
   if (!(await authorizedToken(typeof body.ingestToken === 'string' ? body.ingestToken : null)))
     return jsonError('未授权', 401);
 
