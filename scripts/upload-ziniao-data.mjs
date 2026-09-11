@@ -13,13 +13,13 @@ const origin =
   'https://qinglan-crossborder.skillsam6688.chatgpt.site';
 const source = JSON.parse(await readFile(input, 'utf8'));
 const payload = {
+  ingestToken: token,
   records: source.daily || [],
   snapshots: source.snapshots || [],
   products: source.products || source.topProducts || [],
   insights: source.insights || [],
 };
 const headers = {
-  'X-Ingest-Token': token,
   'OAI-Sites-Authorization': `Bearer ${sitesToken}`,
   'Content-Type': 'application/json',
 };
@@ -39,10 +39,11 @@ try {
 if (!uploaded.ok || !uploadedBody.ok)
   throw new Error(`上传失败: ${uploadedBody.error || uploaded.status}`);
 
-const checked = await fetch(
-  `${origin}/api/ingest?date=${encodeURIComponent(source.businessDate)}`,
-  { headers },
-);
+const checked = await fetch(`${origin}/api/ingest`, {
+  method: 'POST',
+  headers,
+  body: JSON.stringify({ ingestToken: token, readDate: source.businessDate }),
+});
 const checkedBody = await checked.json();
 if (!checked.ok || !checkedBody.ok)
   throw new Error(`回读失败: ${checkedBody.error || checked.status}`);

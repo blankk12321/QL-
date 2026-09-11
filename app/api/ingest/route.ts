@@ -21,9 +21,8 @@ async function same(left: string, right: string) {
   return a.length === b.length && a.every((value, index) => value === b[index]);
 }
 
-async function authorized(request: Request) {
+async function authorizedToken(token: string | null | undefined) {
   const configured = (env as unknown as { INGEST_TOKEN?: string }).INGEST_TOKEN;
-  const token = request.headers.get('x-ingest-token');
   if (!configured || !token) return false;
   return same(token, configured);
 }
@@ -33,7 +32,6 @@ function jsonError(error: string, status: number) {
 }
 
 export async function POST(request: Request) {
-  if (!(await authorized(request))) return jsonError('未授权', 401);
   if (!request.headers.get('content-type')?.startsWith('application/json'))
     return jsonError('须使用 JSON 请求', 415);
 
@@ -44,6 +42,22 @@ export async function POST(request: Request) {
     body = JSON.parse(text);
   } catch {
     return jsonError('JSON 格式无效', 400);
+  }
+
+  if (!(await authorizedToken(typeof body.ingestToken === 'string' ? body.ingestToken : null)))
+    return jsonError('未授权', 401);
+
+  if (typeof body.readDate === 'string') {
+    const db = database();
+    const rows = await db
+      .prepare("SELECT key,value,updated_at FROM workspace WHERE key LIKE ? ORDER BY key")
+      .bind(`daily:${body.readDate}:%`)
+      .all<{ key: string; value: string; updated_at: string }>();
+    return Response.json({
+      ok: true,
+      date: body.readDate,
+      records: rows.results.map((row) => ({ ...JSON.parse(row.value), storedAt: row.updated_at })),
+    });
   }
 
   try {
@@ -102,7 +116,8 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
-  if (!(await authorized(request))) return jsonError('未授权', 401);
+  if (!(await authorizedToken(request.headers.get('x-ingest-token'))))
+    return jsonError('未授权', 401);
   const url = new URL(request.url);
   const date = url.searchParams.get('date');
   if (!date) return jsonError('缺少 date', 400);
