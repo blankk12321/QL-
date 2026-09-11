@@ -92,7 +92,7 @@ export default function Home() {
     [snapshots, setSnapshots] = useState<Snapshot[]>([]),
     [products, setProducts] = useState<ProductDay[]>([]),
     [insights, setInsights] = useState<InsightRow[]>([]);
-  const [range, setRange] = useState<Range>('7d'),
+  const [range, setRange] = useState<Range>('yesterday'),
     [customStart, setCustomStart] = useState(shiftDate(laToday(), -6)),
     [customEnd, setCustomEnd] = useState(laToday()),
     [filter, setFilter] = useState('all'),
@@ -341,6 +341,18 @@ export default function Home() {
           hour12: false,
         }) + ' PT'
       : '未同步';
+  const latestDailyDate = records.map((record) => record.date).sort().at(-1);
+  const latestDailyUpdate = records
+    .filter((record) => record.date === latestDailyDate)
+    .map((record) => record.updatedAt)
+    .filter((value): value is string => Boolean(value))
+    .sort()
+    .at(-1);
+  const latestSnapshotUpdate = snapshots
+    .map((snapshot) => snapshot.checkedAt)
+    .filter(Boolean)
+    .sort()
+    .at(-1);
   if (authorized !== true)
     return (
       <main className="accessgate">
@@ -405,6 +417,11 @@ export default function Home() {
               刷新
             </Button>
           </div>
+        </div>
+        <div className="feedback" role="status">
+          最新完整日报：{latestDailyDate || '未同步'}
+          {latestDailyUpdate ? ` · 入库 ${timeLabel(latestDailyUpdate)}` : ''}
+          {' · '}实时快照：{timeLabel(latestSnapshotUpdate)}
         </div>
         {error && (
           <div className="feedback error" role="alert">
@@ -799,9 +816,7 @@ export default function Home() {
                     <h2>{p.name}</h2>
                     <span className="pill">
                       {s
-                        ? new Date(s.checkedAt).toLocaleDateString('zh-CN', {
-                            timeZone: 'America/Los_Angeles',
-                          })
+                            ? timeLabel(s.checkedAt)
                         : '暂无快照'}
                     </span>
                   </div>
