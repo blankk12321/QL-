@@ -19,7 +19,7 @@ const payload = {
   insights: source.insights || [],
 };
 const headers = {
-  Authorization: `Bearer ${token}`,
+  'X-Ingest-Token': token,
   'OAI-Sites-Authorization': `Bearer ${sitesToken}`,
   'Content-Type': 'application/json',
 };

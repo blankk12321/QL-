@@ -23,9 +23,9 @@ async function same(left: string, right: string) {
 
 async function authorized(request: Request) {
   const configured = (env as unknown as { INGEST_TOKEN?: string }).INGEST_TOKEN;
-  const header = request.headers.get('authorization');
-  if (!configured || !header?.startsWith('Bearer ')) return false;
-  return same(header.slice(7), configured);
+  const token = request.headers.get('x-ingest-token');
+  if (!configured || !token) return false;
+  return same(token, configured);
 }
 
 function jsonError(error: string, status: number) {
