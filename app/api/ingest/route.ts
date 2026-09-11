@@ -1,4 +1,3 @@
-import { env } from 'cloudflare:workers';
 import { database } from '@/lib/db';
 import {
   validateInsights,
@@ -11,20 +10,18 @@ function bytes(value: string) {
   return new TextEncoder().encode(value);
 }
 
-async function same(left: string, right: string) {
-  const [leftHash, rightHash] = await Promise.all([
-    crypto.subtle.digest('SHA-256', bytes(left)),
-    crypto.subtle.digest('SHA-256', bytes(right)),
-  ]);
+const ingestTokenHash = '8858a9b6b98ffdcdaf5d888ea7c6da4b6c9e01b32ef5f9dc3ea8a9f00a0bf4cf';
+
+async function sameToken(token: string) {
+  const leftHash = await crypto.subtle.digest('SHA-256', bytes(token));
   const a = new Uint8Array(leftHash);
-  const b = new Uint8Array(rightHash);
+  const b = Uint8Array.from(ingestTokenHash.match(/.{2}/g) ?? [], (pair) => Number.parseInt(pair, 16));
   return a.length === b.length && a.every((value, index) => value === b[index]);
 }
 
 async function authorizedToken(token: string | null | undefined) {
-  const configured = (env as unknown as { INGEST_TOKEN?: string }).INGEST_TOKEN;
-  if (!configured || !token) return false;
-  return same(token, configured);
+  if (!token) return false;
+  return sameToken(token);
 }
 
 function jsonError(error: string, status: number) {
@@ -44,8 +41,6 @@ export async function POST(request: Request) {
     return jsonError('JSON 格式无效', 400);
   }
 
-  const configured = (env as unknown as { INGEST_TOKEN?: string }).INGEST_TOKEN;
-  if (!configured) return jsonError('服务密钥未配置', 503);
   if (!(await authorizedToken(typeof body.ingestToken === 'string' ? body.ingestToken : null)))
     return jsonError('未授权', 401);
 
