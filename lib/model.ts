@@ -144,11 +144,10 @@ export function aggregateRecords(
   dates: string[],
 ): Daily | undefined {
   if (!dates.length) return undefined;
-  const matches = dates.map((date) =>
-    records.find((r) => r.profile === profile && r.date === date),
-  );
-  if (matches.some((x) => !x)) return undefined;
-  const rows = matches as Daily[];
+  const rows = dates
+    .map((date) => records.find((r) => r.profile === profile && r.date === date))
+    .filter((row): row is Daily => Boolean(row));
+  if (!rows.length) return undefined;
   const updates = rows
     .map((r) => r.updatedAt)
     .filter((v): v is string => typeof v === 'string');
