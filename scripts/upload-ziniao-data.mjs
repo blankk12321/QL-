@@ -12,13 +12,16 @@ const origin =
   process.env.QINGLAN_SITE_ORIGIN ||
   'https://qinglan-crossborder.skillsam6688.chatgpt.site';
 const source = JSON.parse(await readFile(input, 'utf8'));
-const payload = {
-  ingestToken: token,
-  records: source.daily || [],
-  snapshots: source.snapshots || [],
-  products: source.products || source.topProducts || [],
-  insights: source.insights || [],
+const payload = { ingestToken: token };
+const sections = {
+  records: source.daily,
+  snapshots: source.snapshots,
+  products: source.products || source.topProducts,
+  insights: source.insights,
 };
+for (const [key, rows] of Object.entries(sections)) {
+  if (Array.isArray(rows) && rows.length) payload[key] = rows;
+}
 const headers = {
   'OAI-Sites-Authorization': `Bearer ${sitesToken}`,
   'Content-Type': 'application/json',
